@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f4f1e8">
+  <meta name="description" content="A little room for a classic. Play Pocket Blocks with your keyboard or touchscreen.">
+  <title>Pocket Blocks — A little room for a classic</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <header class="masthead"><a class="brand" href="./" aria-label="Pocket Blocks home"><img src="./favicon.svg" alt="" width="30" height="30">POCKET BLOCKS<span class="edition">NO. 001</span></a><button id="help" class="text-button">How to play <span aria-hidden="true">↗</span></button></header>
+  <main>
+    <div class="intro"><div><p class="eyebrow">THE EVERYDAY ARCADE</p><h1>Find your<br><em>flow.</em></h1></div><p class="intro-note">A little room for a classic.<br>Stack. Clear. Start again.</p></div>
+    <section class="arcade" aria-label="Falling block game">
+      <div class="game-area" id="game-area" tabindex="0" aria-label="Game area. Arrow keys move, up rotates, space drops. P pauses.">
+        <div class="board-top"><span><i></i> <span id="state-label">READY WHEN YOU ARE</span></span><span>10 × 20</span></div>
+        <div class="board-wrap">
+          <canvas id="board" width="300" height="600" role="img" aria-label="Tetris playfield: 10 columns and 20 rows"></canvas>
+          <div class="overlay" id="overlay"><div class="overlay-mark" aria-hidden="true">▟</div><p class="eyebrow" id="overlay-kicker">ONE PIECE AT A TIME</p><h2 id="overlay-title">Let's play.</h2><p id="overlay-text">Make a little space.<br>Clear a whole line.</p><button class="primary" id="start">Start game <span aria-hidden="true">→</span></button><span class="overlay-hint" id="overlay-hint">or press Enter</span></div>
+        </div>
+        <div class="board-bottom"><span>KEEP IT SIMPLE. KEEP IT MOVING.</span><span aria-hidden="true">✳</span></div>
+      </div>
+      <aside class="sidebar" aria-label="Game information">
+        <div class="score-card"><p class="eyebrow">YOUR SCORE</p><output id="score">000000</output><div class="best"><span>PERSONAL BEST</span><span id="best">0</span></div></div>
+        <div class="stats"><div><p class="eyebrow">LEVEL</p><output id="level">01</output></div><div><p class="eyebrow">LINES</p><output id="lines">00</output></div></div>
+        <div class="next-card"><p class="eyebrow">UP NEXT</p><canvas id="next" width="160" height="92" role="img" aria-label="Next piece"></canvas><p>Good things take shape.</p></div>
+        <div class="actions"><button id="pause" disabled>Ⅱ <span>Pause</span><kbd>P</kbd></button><button id="restart">↻ <span>New game</span></button></div>
+        <div class="keyboard-guide"><p class="eyebrow">A FEW SMALL MOVES</p><p><span><kbd>←</kbd> <kbd>→</kbd></span> Move</p><p><span><kbd>↑</kbd> <kbd>Z</kbd></span> Rotate</p><p><span><kbd>↓</kbd></span> Soft drop</p><p><span><kbd>space</kbd></span> Hard drop</p></div>
+        <button id="sound" class="sound-button" aria-pressed="false"><span aria-hidden="true">♫</span> Sound off</button>
+      </aside>
+    </section>
+    <div class="touch-controls" aria-label="Touch game controls"><button data-action="left" aria-label="Move left">←</button><button data-action="ccw" aria-label="Rotate counterclockwise">↶</button><button data-action="cw" aria-label="Rotate clockwise">↷</button><button data-action="right" aria-label="Move right">→</button><button data-action="down" aria-label="Soft drop">↓ <small>SOFT</small></button><button data-action="drop" aria-label="Hard drop">⤓ <small>DROP</small></button></div>
+    <p class="below-game">Seven shapes. Endless possibilities. <span>Just one more game.</span></p>
+  </main>
+  <footer><span>A SMALL ESCAPE, ANYTIME.</span><span>BUILT FOR THE LOVE OF PLAY <span aria-hidden="true">✳</span></span></footer>
+  <p id="announcement" class="sr-only" role="status" aria-live="polite"></p>
+  <dialog id="instructions"><button class="close" id="close-help" aria-label="Close instructions">×</button><p class="eyebrow">WELCOME TO POCKET BLOCKS</p><h2>Make some space.</h2><p>Fit the falling pieces together. Fill a horizontal line to clear it. The stack reaches the top? That's game over.</p><dl><dt>Move / soft drop</dt><dd>← → ↓ or A D S</dd><dt>Rotate clockwise</dt><dd>↑, W or X</dd><dt>Rotate counterclockwise</dt><dd>Z</dd><dt>Hard drop</dt><dd>Space</dd><dt>Pause / resume</dt><dd>P or Escape</dd></dl><p>On touchscreens, use the buttons below the board. Hold movement buttons to repeat.</p><p>Clear 1 / 2 / 3 / 4 lines for 40 / 100 / 300 / 1,200 points × level. Every 10 lines makes things a little faster. Pieces lock on contact with a blocked downward step; rotations need room.</p><p class="muted">Best score stays in this browser when local storage is available. Sound is optional.</p></dialog>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
