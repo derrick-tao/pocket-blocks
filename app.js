@@ -101,7 +101,7 @@ function sync() {
   }
   $('best').textContent = best.toLocaleString();
   $('pause').disabled = !['playing','paused'].includes(game.state);
-  $('pause').querySelector('span').textContent = game.state === 'paused' ? 'Resume' : 'Pause';
+  $('pause').querySelector('.action-label').textContent = game.state === 'paused' ? 'Resume' : 'Pause';
   if (game.locks !== priorLocks) {
     priorLocks = game.locks;
     if (game.lastClear) { announce(`${game.lastClear} ${game.lastClear === 1 ? 'line' : 'lines'} cleared. Score ${game.score}. Level ${game.level}.`); beep(550); }

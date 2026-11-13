@@ -10,9 +10,9 @@
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-  <header class="masthead"><a class="brand" href="./" aria-label="Pocket Blocks home"><img src="./favicon.svg" alt="" width="30" height="30">POCKET BLOCKS<span class="edition">NO. 001</span></a><button id="help" class="text-button">How to play <span aria-hidden="true">↗</span></button></header>
+  <header class="masthead"><a class="brand" href="./" aria-label="Pocket Blocks home"><img src="./favicon.svg" alt="" width="30" height="30">POCKET BLOCKS<span class="edition">NO. 001</span></a><button id="help" class="text-button">How to play <span aria-hidden="true">→</span></button></header>
   <main>
-    <div class="intro"><div><p class="eyebrow">THE EVERYDAY ARCADE</p><h1>Find your<br><em>flow.</em></h1></div><p class="intro-note">A little room for a classic.<br>Stack. Clear. Start again.</p></div>
+    <div class="intro"><div><p class="eyebrow">THE EVERYDAY ARCADE</p><h1>Find your<br> <em>flow.</em></h1></div><p class="intro-note">A little room for a classic.<br>Stack. Clear. Start again.</p></div>
     <section class="arcade" aria-label="Falling block game">
       <div class="game-area" id="game-area" tabindex="0" aria-label="Game area. Arrow keys move, up rotates, space drops. P pauses.">
         <div class="board-top"><span><i></i> <span id="state-label">READY WHEN YOU ARE</span></span><span>10 × 20</span></div>
@@ -26,7 +26,7 @@
         <div class="score-card"><p class="eyebrow">YOUR SCORE</p><output id="score">000000</output><div class="best"><span>PERSONAL BEST</span><span id="best">0</span></div></div>
         <div class="stats"><div><p class="eyebrow">LEVEL</p><output id="level">01</output></div><div><p class="eyebrow">LINES</p><output id="lines">00</output></div></div>
         <div class="next-card"><p class="eyebrow">UP NEXT</p><canvas id="next" width="160" height="92" role="img" aria-label="Next piece"></canvas><p>Good things take shape.</p></div>
-        <div class="actions"><button id="pause" disabled>Ⅱ <span>Pause</span><kbd>P</kbd></button><button id="restart">↻ <span>New game</span></button></div>
+        <div class="actions"><button id="pause" disabled><span aria-hidden="true">❚❚</span> <span class="action-label">Pause</span><kbd>P</kbd></button><button id="restart">↻ <span>New game</span></button></div>
         <div class="keyboard-guide"><p class="eyebrow">A FEW SMALL MOVES</p><p><span><kbd>←</kbd> <kbd>→</kbd></span> Move</p><p><span><kbd>↑</kbd> <kbd>Z</kbd></span> Rotate</p><p><span><kbd>↓</kbd></span> Soft drop</p><p><span><kbd>space</kbd></span> Hard drop</p></div>
         <button id="sound" class="sound-button" aria-pressed="false"><span aria-hidden="true">♫</span> Sound off</button>
       </aside>

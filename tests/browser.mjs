@@ -41,8 +41,15 @@ try {
   await phone.goto(base);await phone.locator('#start').tap();
   await phone.locator('[data-action=cw]').tap();await phone.locator('[data-action=left]').tap();
   await phone.locator('[data-action=drop]').tap();assert.ok(Number(await phone.locator('#score').innerText())>0);
-  await phone.locator('[data-action=down]').dispatchEvent('pointerdown',{button:0,pointerId:99,clientX:50,clientY:50});
-  await phone.locator('[data-action=down]').dispatchEvent('pointercancel',{pointerId:99});
+  const down=await phone.locator('[data-action=down]').boundingBox();
+  await phone.mouse.move(down.x+down.width/2,down.y+down.height/2);await phone.mouse.down();
+  const softScore=Number(await phone.locator('#score').innerText());
+  await phone.waitForTimeout(260);
+  assert.ok(Number(await phone.locator('#score').innerText())>softScore);
+  await phone.locator('[data-action=down]').dispatchEvent('pointercancel',{pointerId:1});
+  const cancelled=await phone.locator('#score').innerText();
+  await phone.waitForTimeout(160);assert.equal(await phone.locator('#score').innerText(),cancelled);
+  await phone.mouse.up();
   await phone.locator('#pause').tap();assert.equal(await phone.locator('#overlay-title').innerText(),'Take a breath.');
   await phone.locator('#start').tap();
   assert.ok(await phone.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
