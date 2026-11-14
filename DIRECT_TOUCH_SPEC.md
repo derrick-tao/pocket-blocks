@@ -1,3 +1,5 @@
+> Historical specification: tap, double-tap and upward swipe mappings are superseded by SCORE_LED_CONTROLS_SPEC.md.
+
 # Pocket Blocks: direct-touch playfield controls
 
 Date: 14 November 2026. This enhancement layers onto the completed `OFFLINE_IOS_SPEC.md` release. It changes input and presentation, not the classic game engine, scoring, speed, rotation collision rules, ghost, celebrations, sound, or pause semantics.

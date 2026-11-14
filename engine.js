@@ -7,6 +7,7 @@ export const SHAPES = {
 export class Game {
   constructor(random = Math.random) {
     this.random = random;
+    this.pieceId = 0;
     this.reset();
     this.state = 'ready';
   }
@@ -15,14 +16,22 @@ export class Game {
     this.board = Array.from({length:20}, () => Array(10).fill(null));
     this.score = 0; this.lines = 0; this.level = 1; this.elapsed = 0;
     this.lastClear = 0; this.lastClearEvent = null; this.locks = 0; this.state = 'playing';
+    this.held = null; this.holdAvailable = true;
     this.next = this.pick(); this.spawn();
   }
-  spawn() {
-    const type = this.next;
-    this.next = this.pick();
+  spawn(type = this.next) {
+    if (arguments.length === 0) this.next = this.pick();
+    this.pieceId++;
     this.piece = {type, cells: SHAPES[type].map(row => [...row]), x: Math.floor((10-SHAPES[type].length)/2), y: type === 'I' ? -1 : 0};
     this.elapsed = 0;
     if (!this.fits(this.piece)) this.state = 'over';
+  }
+  hold() {
+    if (this.state !== 'playing' || !this.holdAvailable) return false;
+    const outgoing = this.piece.type, incoming = this.held;
+    this.held = outgoing; this.holdAvailable = false;
+    if (incoming === null) this.spawn(); else this.spawn(incoming);
+    return true;
   }
   fits(piece) {
     return piece.cells.every((row, dy) => row.every((cell, dx) => {
@@ -88,6 +97,7 @@ export class Game {
     this.lines += cleared; this.level = Math.floor(this.lines / 10) + 1;
     if (cleared) this.lastClearEvent = {rows, points, levelBefore, levelAfter:this.level};
     this.board = [...Array.from({length:cleared}, () => Array(10).fill(null)), ...remaining];
+    this.holdAvailable = true;
     this.spawn();
   }
   get interval() { return Math.max(80, 800 * 0.8 ** (this.level-1)); }

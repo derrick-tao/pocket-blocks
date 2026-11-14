@@ -4,7 +4,7 @@ import {initDirectTouch} from './touch-controller.js';
 const $ = id => document.getElementById(id);
 const game = new Game();
 const colors = {I:'#7ebcb0',J:'#7c9cce',L:'#e5a169',O:'#d6c56e',S:'#9bb773',T:'#ad94b9',Z:'#cd7d6f'};
-const board = $('board'), next = $('next'), area = $('game-area');
+const board = $('board'), next = $('next'), holdCanvas = $('hold'), area = $('game-area');
 let best = 0, sound = false, audio, last = performance.now(), priorState, priorLocks = 0;
 try { const saved=Number(localStorage.getItem('pocket-blocks-best'));if(Number.isFinite(saved)&&saved>=0)best=saved; } catch {}
 const touchCapable=navigator.maxTouchPoints>0||matchMedia('(pointer: coarse)').matches;
@@ -16,11 +16,11 @@ try {
 } catch {}
 let directInput=null,runGeneration=0;
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
-let celebration = null,frameHandle=0,inFrame=false,priorModel='',priorDraw='',priorNext='',geometryEpoch=0;
+let celebration = null,frameHandle=0,inFrame=false,priorModel='',priorDraw='',priorNext='',priorHold='',geometryEpoch=0;
 const canvasGeometry=new Map();
 function ensureLoop(){if(game.state==='playing'){if(!frameHandle&&!inFrame){last=performance.now();frameHandle=requestAnimationFrame(frame);}}else if(frameHandle){cancelAnimationFrame(frameHandle);frameHandle=0;}}
 function setText(id,text){const node=$(id);if(node.textContent!==text)node.textContent=text;}
-function invalidateGeometry(){canvasGeometry.clear();geometryEpoch++;priorDraw='';priorNext='';draw();}
+function invalidateGeometry(){canvasGeometry.clear();geometryEpoch++;priorDraw='';priorNext='';priorHold='';draw();}
 function stopCelebration() { if(celebration)priorDraw='';celebration=null;if(!$('clear-celebration').hidden)$('clear-celebration').hidden=true; }
 function celebrate(clear) {
   stopCelebration();
@@ -77,6 +77,7 @@ function act(action,{direct=false}={}) {
   if (action === 'down') accepted=game.down(true);
   if (action === 'cw' && (accepted=game.rotate())) beep(310);
   if (action === 'ccw' && (accepted=game.rotate(-1))) beep(290);
+  if (action === 'hold') { accepted=game.hold(); if(accepted)clearHeldInputs(); }
   if (action === 'drop') { game.drop(); beep(170);accepted=true; }
   if(!inFrame)sync();return accepted;
 }
@@ -84,7 +85,7 @@ function press(key, action) {
   act(action);
   if (['left','right','down'].includes(action) && game.state === 'playing') held.set(key,{action,at:performance.now()+160});
 }
-const keys = {ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',ArrowDown:'down',KeyS:'down',ArrowUp:'cw',KeyW:'cw',KeyX:'cw',KeyZ:'ccw',Space:'drop'};
+const keys = {ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',ArrowDown:'down',KeyS:'down',ArrowUp:'cw',KeyW:'cw',KeyX:'cw',KeyZ:'ccw',KeyC:'hold',ShiftLeft:'hold',ShiftRight:'hold',Space:'drop'};
 document.addEventListener('keydown', event => {
   if ($('instructions').open || $('options-dialog').open || $('install-dialog').open || (event.target instanceof HTMLButtonElement)) return;
   const focused = document.activeElement === area || document.activeElement === document.body;
@@ -185,7 +186,7 @@ reducedMotion.addEventListener('change',()=>{stopCelebration();draw();});
 window.addEventListener('blur',pause);
 document.addEventListener('visibilitychange',() => { if (document.hidden) {pause();try{audio?.suspend().catch(()=>{});}catch{}} });
 function sync() {
-  const model=[game.score,game.lines,game.level,game.state,game.locks,game.piece.x,game.piece.y,game.piece.cells.flat().join(''),game.next].join(':');
+  const model=[game.score,game.lines,game.level,game.state,game.locks,game.piece.x,game.piece.y,game.piece.cells.flat().join(''),game.next,game.held,game.holdAvailable,game.pieceId].join(':');
   if(model===priorModel){if(celebration||priorDraw==='')draw();ensureLoop();return;}priorModel=model;
   setText('score',String(game.score).padStart(6,'0'));
   setText('level',String(game.level).padStart(2,'0'));
@@ -224,6 +225,14 @@ function sync() {
     announce({ready:'Ready. Press Enter or Start game to play.',playing:'Game started. Good luck!',paused:'Game paused.',over:`Game over. Score ${game.score}. Press Enter to play again.`}[state]);
   }
   const nextLabel=`Next piece: ${game.next}`;if(next.getAttribute('aria-label')!==nextLabel)next.setAttribute('aria-label',nextLabel);
+  const holdText=game.held || 'Empty';
+  setText('hold-label',holdText);
+  const holdButton=document.querySelector('.hold-preview');
+  const holdLabel=`Hold: ${holdText}${game.holdAvailable?'':' (unavailable until piece locks)'}`;
+  if(holdButton.getAttribute('aria-label')!==holdLabel)holdButton.setAttribute('aria-label',holdLabel);
+  const holdDisabled=game.state!=='playing'||!game.holdAvailable;
+  if(holdButton.disabled!==holdDisabled)holdButton.disabled=holdDisabled;
+  holdButton.classList.toggle('unavailable',!game.holdAvailable);
   draw();ensureLoop();
 }
 function context(canvas) {
@@ -237,7 +246,7 @@ function block(ctx,x,y,size,type) {
   ctx.fillStyle='#00000012'; ctx.fillRect(x+2,y+size-4,size-4,2);
 }
 function draw() {
-  const key=[geometryEpoch,window.devicePixelRatio,game.state,game.locks,game.piece.x,game.piece.y,game.piece.cells.flat().join(''),options.ghost,celebration?.age??'none'].join(':');
+  const key=[geometryEpoch,window.devicePixelRatio,game.state,game.locks,game.pieceId,game.piece.type,game.held,game.holdAvailable,game.piece.x,game.piece.y,game.piece.cells.flat().join(''),options.ghost,celebration?.age??'none'].join(':');
   if(key===priorDraw)return;priorDraw=key;
   const {ctx,width,height}=context(board), size=width/10;
   ctx.strokeStyle='#a7bca00b'; ctx.lineWidth=1;
@@ -271,15 +280,21 @@ function draw() {
     }
     ctx.restore();
   }
-  const nextKey=[game.next,geometryEpoch,window.devicePixelRatio].join(':');if(nextKey===priorNext)return;priorNext=nextKey;
-  const preview=context(next), cells=[];
-  SHAPES[game.next].forEach((row,y)=>row.forEach((cell,x)=>{if(cell)cells.push([x,y]);}));
+  const nextKey=[game.next,geometryEpoch,window.devicePixelRatio].join(':');
+  if(nextKey!==priorNext){priorNext=nextKey;drawPreview(next,game.next);}
+  const holdKey=[game.held,game.holdAvailable,geometryEpoch,window.devicePixelRatio].join(':');
+  if(holdKey!==priorHold){priorHold=holdKey;drawPreview(holdCanvas,game.held);}
+}
+function drawPreview(canvas,type){
+  const preview=context(canvas);if(!type)return;
+  const cells=[];
+  SHAPES[type].forEach((row,y)=>row.forEach((cell,x)=>{if(cell)cells.push([x,y]);}));
   const minX=Math.min(...cells.map(c=>c[0])),minY=Math.min(...cells.map(c=>c[1]));
   const cols=Math.max(...cells.map(c=>c[0]))-minX+1,rows=Math.max(...cells.map(c=>c[1]))-minY+1;
-  const s=Math.min(23,(preview.width-12)/cols);
-  for (const [x,y] of cells) block(preview.ctx,(preview.width-cols*s)/2+(x-minX)*s,(preview.height-rows*s)/2+(y-minY)*s,s,game.next);
+  const size=Math.min(23,(preview.width-4)/cols,(preview.height-4)/rows);
+  for(const [x,y] of cells)block(preview.ctx,(preview.width-cols*size)/2+(x-minX)*size,(preview.height-rows*size)/2+(y-minY)*size,size,type);
 }
-const resizeObserver=new ResizeObserver(invalidateGeometry);resizeObserver.observe(area);resizeObserver.observe(next);
+const resizeObserver=new ResizeObserver(invalidateGeometry);resizeObserver.observe(area);resizeObserver.observe(next);resizeObserver.observe(holdCanvas);
 window.addEventListener('resize',invalidateGeometry);
 let dprQuery;
 function watchDpr(){dprQuery?.removeEventListener('change',dprChanged);dprQuery=matchMedia(`(resolution: ${window.devicePixelRatio||1}dppx)`);dprQuery.addEventListener('change',dprChanged);}
@@ -296,5 +311,5 @@ function frame(now) {
   }
   inFrame=false;if(game.state==='playing'&&!frameHandle)frameHandle=requestAnimationFrame(frame);
 }
-directInput=initDirectTouch({board,snapshot:()=>({enabled:options.touchMode==='direct'&&game.state==='playing'&&!document.querySelector('dialog[open]'),token:`${runGeneration}:${game.locks}`,piece:game.piece}),emit:action=>act(action,{direct:true}),beginInput:()=>{clearHeldInputs();focusGame();unlockAudio();}});
+directInput=initDirectTouch({board,snapshot:()=>({enabled:options.touchMode==='direct'&&game.state==='playing'&&!document.querySelector('dialog[open]'),token:`${runGeneration}:${game.pieceId}`,piece:game.piece}),emit:action=>act(action,{direct:true}),beginInput:()=>{clearHeldInputs();focusGame();unlockAudio();}});
 sync();initOffline({pause,focusGame,isActive:()=>['playing','paused'].includes(game.state)});

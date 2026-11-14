@@ -21,6 +21,7 @@ try{
   const cycles=async count=>{for(let i=0;i<count;i++){
     await gesture(i%2===1);
     if(i%20===0){await page.locator('#options').tap();await page.locator('#touch-mode-option').selectOption('buttons');await page.locator('#touch-mode-option').selectOption('direct');await page.locator('#close-options').tap();await page.locator('#start').tap();}
+    if(i%10===0){await page.keyboard.press('KeyC');await page.keyboard.press('Space');}
     if(i%40===0)await page.locator('#restart').tap();
   }};
   const sample=async()=>{await page.waitForTimeout(80);await cdp.send('HeapProfiler.collectGarbage');return {...await cdp.send('Memory.getDOMCounters'),heap:(await cdp.send('Runtime.getHeapUsage')).usedSize};};
@@ -39,5 +40,5 @@ try{
   },{left:r.x,top:r.y,c});
   assert.equal(report.coalescing.layoutReads,0);assert.equal(report.coalescing.domMutations,0);assert.ok(report.coalescing.boardDraws<=65,JSON.stringify(report.coalescing));
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await page.locator('#pause').tap();await page.waitForTimeout(50);const idle=await page.evaluate(()=>window.__raf);await page.waitForTimeout(300);report.pausedRaf=await page.evaluate(before=>window.__raf-before,idle);assert.equal(report.pausedRaf,0);
-  report.gestures=260;report.lifecycle='repeated direct taps, options/mode switches, pause/resume and restart';await mkdir('test-results',{recursive:true});await writeFile('test-results/direct-performance.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
+  report.gestures=260;report.lifecycle='repeated direct taps, options/mode switches, hold/drop, pause/resume and restart';await mkdir('test-results',{recursive:true});await writeFile('test-results/direct-performance.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 }finally{await browser.close();await local.close();}

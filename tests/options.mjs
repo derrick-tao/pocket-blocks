@@ -58,7 +58,7 @@ try{
     const move=Game.prototype.move;Game.prototype.move=function(...args){const ok=move.apply(this,args);window.__positions.push(this.piece.x);return ok;};
   },await engineUrl(phone));
   await phone.locator('#start').tap();const cdp=await mobile.newCDPSession(phone);
-  const press=async(action,id=1)=>{const r=await phone.locator(`[data-action="${action}"]`).boundingBox();await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:r.x+r.width/2,y:r.y+r.height/2,id}]});};
+  const press=async(action,id=1)=>{await phone.locator(`[data-action="${action}"]`).scrollIntoViewIfNeeded();const r=await phone.locator(`[data-action="${action}"]`).boundingBox();await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:r.x+r.width/2,y:r.y+r.height/2,id}]});};
   const end=()=>cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
   const stopped=async()=>{const n=await phone.evaluate(()=>window.__positions.length);await phone.waitForTimeout(260);assert.equal(await phone.evaluate(()=>window.__positions.length),n);assert.equal(await phone.locator('.is-held').count(),0);};
   await press('left');assert.equal(await phone.locator('[data-action="left"]').evaluate(node=>node.classList.contains('is-held')),true);await phone.waitForTimeout(230);await end();await stopped();

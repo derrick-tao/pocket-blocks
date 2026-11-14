@@ -82,3 +82,16 @@ test('gravity accelerates on every level until its lower bound',()=>{
   for(let level=1;level<=20;level++){g.level=level;assert.ok(g.interval<=previous);assert.ok(g.interval>=80);previous=g.interval;}
   g.level=5;assert.ok(Math.abs(g.interval-327.68)<.001);
 });
+
+test('hold stores, swaps, resets spawn state, and tracks every replacement',()=>{
+  let n=0;const game=new Game(()=>[0,.2,.4][n++%3]);game.reset();
+  const first=game.piece.type,next=game.next,id=game.pieceId,board=structuredClone(game.board);
+  game.piece.x=0;game.piece.y=8;game.elapsed=300;game.score=42;
+  assert.equal(game.hold(),true);assert.equal(game.held,first);assert.equal(game.piece.type,next);assert.equal(game.pieceId,id+1);assert.equal(game.elapsed,0);assert.equal(game.score,42);assert.deepEqual(game.board,board);
+  const queued=game.next;assert.equal(game.hold(),false);game.drop();assert.equal(game.holdAvailable,true);const outgoing=game.piece.type,afterDropNext=game.next,afterDropId=game.pieceId;
+  assert.equal(game.hold(),true);assert.equal(game.held,outgoing);assert.equal(game.piece.type,first);assert.equal(game.next,afterDropNext);assert.equal(game.pieceId,afterDropId+1);assert.deepEqual(game.piece.cells,SHAPES[first]);assert.equal(game.piece.x,Math.floor((10-SHAPES[first].length)/2));assert.equal(game.piece.y,first==='I'?-1:0);
+  game.reset();assert.equal(game.held,null);assert.equal(game.holdAvailable,true);assert.ok(game.pieceId>id);assert.ok(queued);
+});
+test('hold rejects nonplaying states and blocked incoming spawn tops out',()=>{
+  const game=new Game(()=>0);assert.equal(game.hold(),false);game.reset();game.pause();assert.equal(game.hold(),false);game.resume();game.board[0].fill('T');assert.equal(game.hold(),true);assert.equal(game.state,'over');assert.equal(game.hold(),false);
+});
