@@ -5,6 +5,7 @@ A lightweight classic falling-block game for desktop and mobile, with keyboard/t
 - [Play](https://derrick-tao.github.io/pocket-blocks/)
 - [Gameplay spec](SPEC.md)
 - [Offline/iOS/security/performance spec](OFFLINE_IOS_SPEC.md)
+- [Direct-touch controls spec](DIRECT_TOUCH_SPEC.md)
 - [Security and performance review](SECURITY_PERFORMANCE_REVIEW.md)
 - [Privacy and local storage](privacy.html)
 
@@ -22,7 +23,11 @@ Opaque 180px Apple and 192px/512px/maskable manifest icons use Pocket Blocks’ 
 
 ## Controls and zoom
 
-Arrows or A/D/S move and soft drop; Up/W/X rotates clockwise, Z counterclockwise; Space hard drops; P/Escape pauses/resumes; Enter starts/resumes. Touch buttons support held movement and multiple fingers. Release, cancellation, capture loss, context menu, blur, page hide, scroll, and resize clear held input.
+Arrows or A/D/S move and soft drop; Up/W/X rotates clockwise, Z counterclockwise; Space hard drops; P/Escape pauses/resumes; Enter starts/resumes. Desktop keyboard controls remain unchanged.
+
+Touch devices default to **Playfield gestures**, with no visible direction/drop button strip. Tap either side of the piece to move one column; swipe horizontally to guide it; tap an occupied piece cell for clockwise rotation; double-tap the piece for one counter-clockwise rotation; swipe up for clockwise rotation; swipe down slowly for soft drop; flick sharply downward for one hard drop. A single piece tap briefly waits to distinguish a double-tap. Holding still does not repeat a swipe; two fingers cancel matrix gestures. Upward swipe rotates clockwise—drawing circles is not a separate gesture.
+
+Prefer explicit controls? Choose **Game options → Touch controls → Visible buttons**. Those buttons retain held movement, independent multi-touch, and release/cancellation/capture-loss/context-menu/blur/page-hide/scroll/resize safeguards. The control choice saves alongside ghost and celebration options. No gesture path/history is retained or uploaded.
 
 The mobile viewport requests scale 1 with zoom disabled. Page/dialog touch policies preserve normal scrolling while excluding pinch/double-tap zoom; Safari gesture events are prevented without canceling all touchmove events. Touch game controls retain touch-action:none. Browser/OS accessibility settings can override these requests; desktop browser UI zoom cannot be disabled. Physical iOS pinch/Home Screen installation remains unverified here.
 
@@ -38,7 +43,7 @@ npm start
 # http://localhost:4173
 ```
 
-`npm test` runs the 12 engine tests plus build/PWA assertions and generates dist. Browser gates run sequentially to avoid focus/auto-pause interference and start isolated localhost-only fixture servers under `/pocket-blocks/`. `npm run test:browser`, `test:options`, `test:pwa`, `test:offline`, and `test:performance` can be run individually after a build. `TEST_URL` selects a normal live-site smoke check for browser/options/PWA suites. Local Linux can use `/usr/bin/chromium`; override with CHROMIUM_PATH, while CI installs the matching Playwright browser. Screenshots and measurements are ignored in test-results.
+`npm test` runs the 12 engine tests, build/PWA assertions, and pure gesture tests, and generates dist. Browser gates run sequentially to avoid focus/auto-pause interference and start isolated localhost-only fixture servers under `/pocket-blocks/`. `npm run test:browser`, `test:options`, `test:direct`, `test:pwa`, `test:offline`, and `test:performance` can be run individually after a build. `TEST_URL` selects a normal live-site smoke check for browser/options/direct/PWA suites. Local Linux can use `/usr/bin/chromium`; override with CHROMIUM_PATH, while CI installs the matching Playwright browser. Screenshots and measurements are ignored in test-results.
 
 The build discovers root `.js` runtime modules excluding build.js/sw.js, rejects external/non-root runtime imports, fingerprints the dependency graph, and rewrites local JS/CSS references. Put test/tooling code in subdirectories. It generates a release ID from production inputs plus build logic, and an integrity manifest embedded in sw.js. Source files are never rewritten by the build. Serve **dist/**, not the source worker template. Runtime dependencies remain zero.
 

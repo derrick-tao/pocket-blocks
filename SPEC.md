@@ -13,6 +13,8 @@ A lightweight single-player falling-block game, playable with a keyboard or touc
 - Save the best score locally when possible. Storage failure must never prevent play. No saved in-progress session.
 
 ## Controls
+Touch-capable devices default to unobstructed matrix gestures. See [DIRECT_TOUCH_SPEC.md](DIRECT_TOUCH_SPEC.md) for exact thresholds, delayed tap/double-tap arbitration, flick safety, and cancellation. The table's touch buttons remain available through Game options → Touch controls → Visible buttons; desktop keyboard behavior is unchanged.
+
 | Action | Keyboard | Touch |
 | --- | --- | --- |
 | Move | Left/right arrows or A/D | Left/right buttons; hold to repeat |
@@ -41,6 +43,8 @@ Verification: all 12 engine tests passed, including projection/hard-drop agreeme
 Warm paper background, orange accent, dark playfield, crisp colored blocks, readable score/level/lines/best, next preview, visible controls, optional synthesized sound off by default, instructions dialog, and state overlays. Responsive two-column desktop layout becomes a compact mobile layout. Touch targets at least 44px; visible keyboard focus, semantic buttons, labelled canvases, polite state/clear announcements, reduced-motion support. Canvas gameplay requires visual perception; screen-reader-complete gameplay is outside this release.
 
 ## Architecture and performance
+Direct input stores only one gesture, a pending tap, and bounded pointer IDs; it is advanced by the existing playing RAF. No extra timer or persistent input loop is added. Raw moves coalesce before engine actions and in-frame actions share the final frame render. Its modules join the generated integrity precache automatically. The locally saved touch-mode enum preserves old ghost/celebration preferences; no gesture history is retained or uploaded.
+
 Plain HTML/CSS/JavaScript ES modules. Pure game engine separated from canvas rendering and input. requestAnimationFrame rendering; scale canvas backing resolution for device pixel ratio. Target latest Chrome, Edge, Firefox, and Safari, including Android Chrome and iOS Safari. No network access after loading local assets. Aim for <100KB uncompressed production assets and smooth interaction on ordinary phones.
 
 ## Verification and delivery

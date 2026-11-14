@@ -40,6 +40,7 @@ try {
   assert.equal(await page.locator('#score').innerText(),'000000');
   await context.close();
   const mobile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2});
+  await mobile.addInitScript(()=>localStorage.setItem('pocket-blocks-options',JSON.stringify({touchMode:'buttons'})));
   const phone=await mobile.newPage();phone.on('pageerror',error=>errors.push(error.message));
   await phone.goto(base);await phone.locator('#start').tap();
   await phone.locator('[data-action=cw]').tap();await phone.locator('[data-action=left]').tap();

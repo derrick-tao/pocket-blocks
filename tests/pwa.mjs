@@ -5,7 +5,7 @@ const local=process.env.TEST_URL?null:await serve(),browser=await launchBrowser(
 const errors=[];
 try{
  const ctx=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2});
- await ctx.addInitScript(()=>{localStorage.setItem('pocket-blocks-best','1234');localStorage.setItem('pocket-blocks-options',JSON.stringify({ghost:false,celebrations:true}));window.__csp=[];document.addEventListener('securitypolicyviolation',e=>window.__csp.push(e.violatedDirective));});
+ await ctx.addInitScript(()=>{localStorage.setItem('pocket-blocks-best','1234');localStorage.setItem('pocket-blocks-options',JSON.stringify({ghost:false,celebrations:true,touchMode:'buttons'}));window.__csp=[];document.addEventListener('securitypolicyviolation',e=>window.__csp.push(e.violatedDirective));});
  const page=await ctx.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(base);await page.waitForFunction(()=>document.querySelector('#offline-status').textContent.includes('Ready to play offline'));
  assert.equal(await page.locator('#best').innerText(),'1,234');
  const viewport=await page.locator('meta[name=viewport]').getAttribute('content');for(const part of ['maximum-scale=1','minimum-scale=1','user-scalable=no','viewport-fit=cover'])assert.ok(viewport.includes(part));

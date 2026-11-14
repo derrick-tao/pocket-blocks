@@ -4,7 +4,7 @@ import {launchBrowser,serve} from './helpers.mjs';
 const local=await serve(),browser=await launchBrowser({args:['--js-flags=--expose-gc']}),report={date:new Date().toISOString(),engine:'Chromium'};
 try{
  const ctx=await browser.newContext({viewport:{width:1280,height:900}});await ctx.addInitScript(()=>{
-  Math.random=()=>0;window.confirm=()=>true;window.__raf=0;window.__boardReads=0;window.__nextReads=0;window.__boardDraws=0;window.__nextDraws=0;
+  Math.random=()=>0;window.confirm=()=>true;localStorage.setItem('pocket-blocks-options',JSON.stringify({touchMode:'buttons'}));window.__raf=0;window.__boardReads=0;window.__nextReads=0;window.__boardDraws=0;window.__nextDraws=0;
   const raf=window.requestAnimationFrame;window.requestAnimationFrame=callback=>raf.call(window,time=>{window.__raf++;callback(time);});
   const rect=HTMLCanvasElement.prototype.getBoundingClientRect;HTMLCanvasElement.prototype.getBoundingClientRect=function(...args){if(this.id==='board')window.__boardReads++;if(this.id==='next')window.__nextReads++;return rect.apply(this,args);};
   const clear=CanvasRenderingContext2D.prototype.clearRect;CanvasRenderingContext2D.prototype.clearRect=function(...args){if(this.canvas.id==='board')window.__boardDraws++;if(this.canvas.id==='next')window.__nextDraws++;return clear.apply(this,args);};
