@@ -5,7 +5,25 @@ const colors = {I:'#7ebcb0',J:'#7c9cce',L:'#e5a169',O:'#d6c56e',S:'#9bb773',T:'#
 const board = $('board'), next = $('next'), area = $('game-area');
 let best = 0, sound = false, audio, last = performance.now(), priorState, priorLocks = 0;
 try { best = Math.max(0, Number(localStorage.getItem('pocket-blocks-best')) || 0); } catch {}
+const options = {ghost:true, celebrations:true};
+try {
+  const saved = JSON.parse(localStorage.getItem('pocket-blocks-options'));
+  for (const key of Object.keys(options)) if (typeof saved?.[key] === 'boolean') options[key] = saved[key];
+} catch {}
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+let celebration = null;
+function stopCelebration() { celebration=null; $('clear-celebration').hidden=true; }
+function celebrate(clear) {
+  stopCelebration();
+  if (!options.celebrations || !clear) return;
+  const count=clear.rows.length, reduced=reducedMotion.matches;
+  celebration={age:0,duration:reduced?650:1000,rows:clear.rows,particles:reduced?[]:Array.from({length:Math.min(80,count*20)},()=>({x:Math.random(),y:clear.rows[Math.floor(Math.random()*count)]+.5,vx:(Math.random()-.5)*.0006,vy:-.002-Math.random()*.003,color:colors[Object.keys(colors)[Math.floor(Math.random()*7)]]}))};
+  $('clear-title').textContent=['','Nice clear!','Double clear!','Triple clear!','Four lines!'][count];
+  $('clear-detail').textContent=`+${clear.points.toLocaleString()}${clear.levelAfter>clear.levelBefore?` · Level ${clear.levelAfter}!`:''}`;
+  $('clear-celebration').hidden=false;
+}
 const held = new Map();
+const touchPresses = new Map();
 function announce(message) { $('announcement').textContent = message; }
 function beep(frequency = 330) {
   if (!sound) return;
@@ -20,12 +38,22 @@ function beep(frequency = 330) {
     oscillator.start(); oscillator.stop(audio.currentTime+.1);
   } catch {}
 }
-function clearInputs() { held.clear(); }
+function releasePointer(pointerId) {
+  held.delete(`touch-${pointerId}`);
+  const press=touchPresses.get(pointerId);
+  touchPresses.delete(pointerId);
+  if (press) press.button.classList.toggle('is-held',[...touchPresses.values()].some(other=>other.button===press.button));
+}
+function clearInputs() {
+  held.clear();
+  for (const id of [...touchPresses.keys()]) releasePointer(id);
+}
 function focusGame() { area.focus({preventScroll:true}); }
-function start() { clearInputs(); game.reset(); priorLocks=0; last=performance.now(); focusGame(); beep(440); sync(); }
-function pause() { clearInputs(); game.pause(); sync(); }
+function start() { clearInputs(); stopCelebration(); game.reset(); priorLocks=0; last=performance.now(); focusGame(); beep(440); sync(); }
+function pause() { clearInputs(); stopCelebration(); game.pause(); sync(); }
 function togglePause() {
   clearInputs();
+  stopCelebration();
   if (game.state === 'playing') game.pause();
   else if (game.state === 'paused') { game.resume(); last=performance.now(); }
   focusGame(); sync();
@@ -46,7 +74,7 @@ function press(key, action) {
 }
 const keys = {ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',ArrowDown:'down',KeyS:'down',ArrowUp:'cw',KeyW:'cw',KeyX:'cw',KeyZ:'ccw',Space:'drop'};
 document.addEventListener('keydown', event => {
-  if ($('instructions').open || (event.target instanceof HTMLButtonElement)) return;
+  if ($('instructions').open || $('options-dialog').open || (event.target instanceof HTMLButtonElement)) return;
   const focused = document.activeElement === area || document.activeElement === document.body;
   if (!focused) return;
   if (keys[event.code] || ['KeyP','Escape','Enter'].includes(event.code)) event.preventDefault();
@@ -57,17 +85,38 @@ document.addEventListener('keydown', event => {
   } else if (['KeyP','Escape'].includes(event.code)) togglePause();
   else if (keys[event.code]) press(event.code,keys[event.code]);
 });
-document.addEventListener('keyup', event => held.delete(event.code));
+window.addEventListener('keyup', event => held.delete(event.code),true);
+// A release can arrive outside the original control or after capture is interrupted.
+for (const type of ['pointerup','pointercancel','lostpointercapture']) window.addEventListener(type,event=>releasePointer(event.pointerId),true);
+for (const type of ['touchend','touchcancel']) window.addEventListener(type,event=>{
+  if (event.touches?.length===0) for (const [id,press] of touchPresses) if (press.pointerType==='touch') releasePointer(id);
+},{capture:true,passive:true});
+window.addEventListener('mouseup',()=>{for (const [id,press] of touchPresses) if (press.pointerType!=='touch') releasePointer(id);},true);
+window.addEventListener('pointermove',event=>{
+  if (!touchPresses.has(event.pointerId)) return;
+  if (event.pointerType!=='touch' && !(event.buttons&1)) { releasePointer(event.pointerId); return; }
+  const r=touchPresses.get(event.pointerId).button.getBoundingClientRect();
+  if (event.clientX<r.left || event.clientX>r.right || event.clientY<r.top || event.clientY>r.bottom) releasePointer(event.pointerId);
+},true);
+window.addEventListener('contextmenu',event=>{
+  clearInputs();
+  if (event.target instanceof Element && event.target.closest('[data-action]')) event.preventDefault();
+},true);
+window.addEventListener('pagehide',clearInputs);
+window.addEventListener('resize',clearInputs);
+window.addEventListener('scroll',clearInputs,true);
+window.addEventListener('pointerout',event=>{if(event.pointerType==='mouse'&&!event.relatedTarget)clearInputs();});
 document.querySelectorAll('[data-action]').forEach(button => {
   button.addEventListener('pointerdown', event => {
     if (event.button !== 0) return;
-    event.preventDefault(); focusGame(); button.setPointerCapture(event.pointerId);
+    event.preventDefault(); focusGame();
+    try { button.setPointerCapture(event.pointerId); }
+    catch { act(button.dataset.action); return; }
+    if (game.state!=='playing') return;
+    releasePointer(event.pointerId);
+    touchPresses.set(event.pointerId,{button,pointerType:event.pointerType});
+    button.classList.add('is-held');
     press(`touch-${event.pointerId}`,button.dataset.action);
-  });
-  for (const type of ['pointerup','pointercancel','lostpointercapture']) button.addEventListener(type,event => held.delete(`touch-${event.pointerId}`));
-  button.addEventListener('pointermove', event => {
-    const r=button.getBoundingClientRect();
-    if (event.clientX<r.left || event.clientX>r.right || event.clientY<r.top || event.clientY>r.bottom) held.delete(`touch-${event.pointerId}`);
   });
   button.addEventListener('click',event => { if (event.detail === 0) { act(button.dataset.action); focusGame(); } });
 });
@@ -89,6 +138,24 @@ $('sound').onclick = () => {
 $('help').onclick = () => { pause(); $('instructions').showModal(); };
 $('close-help').onclick = () => $('instructions').close();
 $('instructions').addEventListener('close',focusGame);
+$('ghost-option').checked=options.ghost;
+$('celebrations-option').checked=options.celebrations;
+for (const [id,key] of [['ghost-option','ghost'],['celebrations-option','celebrations']]) {
+  $(id).onchange=event=>{
+    options[key]=event.target.checked;
+    try { localStorage.setItem('pocket-blocks-options',JSON.stringify(options)); } catch {}
+    if (!options.celebrations) stopCelebration();
+    draw();
+  };
+}
+$('options').onclick=()=>{
+  pause();
+  $('options-pause-note').textContent=game.state==='paused'?'Your game is paused. Close options, then choose Resume game.':'Close this dialog to return to your game.';
+  $('options-dialog').showModal();
+};
+$('close-options').onclick=()=>$('options-dialog').close();
+$('options-dialog').addEventListener('close',focusGame);
+reducedMotion.addEventListener('change',()=>{stopCelebration();draw();});
 window.addEventListener('blur',pause);
 document.addEventListener('visibilitychange',() => { if (document.hidden) pause(); });
 function sync() {
@@ -104,12 +171,13 @@ function sync() {
   $('pause').querySelector('.action-label').textContent = game.state === 'paused' ? 'Resume' : 'Pause';
   if (game.locks !== priorLocks) {
     priorLocks = game.locks;
-    if (game.lastClear) { announce(`${game.lastClear} ${game.lastClear === 1 ? 'line' : 'lines'} cleared. Score ${game.score}. Level ${game.level}.`); beep(550); }
+    if (game.lastClear) { announce(`${game.lastClear} ${game.lastClear === 1 ? 'line' : 'lines'} cleared. Score ${game.score}. Level ${game.level}.`); beep(550); celebrate(game.lastClearEvent); }
   }
   if (priorState !== game.state) {
     priorState = game.state;
     clearInputs();
     const state = game.state;
+    if (state !== 'playing') stopCelebration();
     $('overlay').hidden = state === 'playing';
     $('state-label').textContent = {ready:'READY WHEN YOU ARE',playing:'A LITTLE MORE SPACE',paused:'TAKE YOUR TIME',over:'ANOTHER ROUND?'}[state];
     if (state === 'paused') {
@@ -149,9 +217,33 @@ function draw() {
   for (let x=1;x<10;x++) { ctx.beginPath();ctx.moveTo(x*size,0);ctx.lineTo(x*size,height);ctx.stroke(); }
   for (let y=1;y<20;y++) { ctx.beginPath();ctx.moveTo(0,y*size);ctx.lineTo(width,y*size);ctx.stroke(); }
   game.board.forEach((row,y)=>row.forEach((type,x)=>{ if(type) block(ctx,x*size,y*size,size,type); }));
+  if (options.ghost && game.state === 'playing') {
+    const landing=game.landingPiece();
+    if (landing && landing.y!==game.piece.y) {
+      ctx.save(); ctx.strokeStyle=colors[landing.type]; ctx.lineWidth=2; ctx.globalAlpha=.8;
+      landing.cells.forEach((row,dy)=>row.forEach((cell,dx)=>{
+        if (cell && landing.y+dy>=0) ctx.strokeRect((landing.x+dx)*size+3,(landing.y+dy)*size+3,size-6,size-6);
+      }));
+      ctx.restore();
+    }
+  }
   if (game.state !== 'ready') game.piece.cells.forEach((row,dy)=>row.forEach((cell,dx)=>{
     if(cell && game.piece.y+dy>=0) block(ctx,(game.piece.x+dx)*size,(game.piece.y+dy)*size,size,game.piece.type);
   }));
+  if (celebration && game.state==='playing') {
+    const life=1-celebration.age/celebration.duration;
+    ctx.save();
+    if (!reducedMotion.matches) {
+      ctx.fillStyle=`rgba(246,214,149,${life*.28})`;
+      for (const row of celebration.rows) ctx.fillRect(0,row*size,width,size);
+      for (const bit of celebration.particles) {
+        const age=celebration.age;
+        ctx.globalAlpha=life; ctx.fillStyle=bit.color;
+        ctx.fillRect((bit.x+bit.vx*age)*width,(bit.y+bit.vy*age+.000004*age*age)*size,Math.max(2,size*.13),Math.max(2,size*.13));
+      }
+    }
+    ctx.restore();
+  }
   const preview=context(next), cells=[];
   SHAPES[game.next].forEach((row,y)=>row.forEach((cell,x)=>{if(cell)cells.push([x,y]);}));
   const minX=Math.min(...cells.map(c=>c[0])),minY=Math.min(...cells.map(c=>c[1]));
@@ -163,6 +255,8 @@ new ResizeObserver(draw).observe(area);
 function frame(now) {
   const dt=Math.min(now-last,100); last=now;
   if (game.state === 'playing') {
+    for (const [id,press] of touchPresses) if (!press.button.hasPointerCapture(id)) releasePointer(id);
+    if (celebration) { celebration.age+=dt; if (celebration.age>=celebration.duration) stopCelebration(); }
     for (const input of held.values()) if (now>=input.at) { input.at=now+55; act(input.action); }
     game.tick(dt); sync();
   }

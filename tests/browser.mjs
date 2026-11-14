@@ -22,11 +22,13 @@ try {
   await page.locator('#sound').click();assert.equal(await page.locator('#sound').getAttribute('aria-pressed'),'true');
   await page.locator('#help').click();assert.equal(await page.locator('#instructions').isVisible(),true);
   await page.keyboard.press('Escape');assert.equal(await page.locator('#instructions').isVisible(),false);
+  await page.waitForFunction(()=>document.activeElement?.id==='game-area');
   assert.equal(await page.locator('#overlay').isVisible(),true);
   await page.keyboard.press('Enter');
   await page.evaluate(()=>window.dispatchEvent(new Event('blur')));
   assert.equal(await page.locator('#overlay-title').innerText(),'Take a breath.');
   await page.keyboard.press('Enter');
+  assert.equal(await page.locator('#overlay').isVisible(),false);
   await page.screenshot({path:'test-results/desktop-playing.png',fullPage:true});
   for(let n=0;n<35 && !(await page.locator('#overlay').isVisible());n++)await page.keyboard.press('Space');
   assert.equal(await page.locator('#overlay-title').innerText(),'One more?');

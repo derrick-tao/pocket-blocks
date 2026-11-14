@@ -14,7 +14,7 @@ export class Game {
   reset() {
     this.board = Array.from({length:20}, () => Array(10).fill(null));
     this.score = 0; this.lines = 0; this.level = 1; this.elapsed = 0;
-    this.lastClear = 0; this.locks = 0; this.state = 'playing';
+    this.lastClear = 0; this.lastClearEvent = null; this.locks = 0; this.state = 'playing';
     this.next = this.pick(); this.spawn();
   }
   spawn() {
@@ -61,7 +61,14 @@ export class Game {
     }
     this.lock();
   }
+  landingPiece() {
+    if (!this.piece || !this.fits(this.piece)) return null;
+    const landing = {...this.piece};
+    while (this.fits({...landing, y:landing.y+1})) landing.y++;
+    return landing;
+  }
   lock() {
+    this.lastClear = 0; this.lastClearEvent = null;
     let above = false;
     this.piece.cells.forEach((row,dy) => row.forEach((cell,dx) => {
       if (!cell) return;
@@ -73,9 +80,13 @@ export class Game {
     if (above) { this.state = 'over'; return; }
     const remaining = this.board.filter(row => row.some(cell => !cell));
     const cleared = 20 - remaining.length;
+    const rows = this.board.flatMap((row,y) => row.every(Boolean) ? [y] : []);
+    const levelBefore = this.level;
+    const points = [0,40,100,300,1200][cleared] * levelBefore;
     this.lastClear = cleared;
-    this.score += [0,40,100,300,1200][cleared] * this.level;
+    this.score += points;
     this.lines += cleared; this.level = Math.floor(this.lines / 10) + 1;
+    if (cleared) this.lastClearEvent = {rows, points, levelBefore, levelAfter:this.level};
     this.board = [...Array.from({length:cleared}, () => Array(10).fill(null)), ...remaining];
     this.spawn();
   }

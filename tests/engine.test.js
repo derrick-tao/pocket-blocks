@@ -59,3 +59,26 @@ test('restart resets board, points, speed, timing, and state',()=>{
   assert.equal(g.score,0);assert.equal(g.lines,0);assert.equal(g.level,1);assert.equal(g.elapsed,0);
   assert.equal(g.state,'playing');assert.ok(g.board.flat().every(c=>c===null));
 });
+test('landing projection matches hard drop on floors, stacks and rotated pieces without mutation',()=>{
+  for(const [type,cells] of Object.entries(SHAPES))for(const rotated of [false,true]){
+    const g=fresh();g.piece={type,cells:structuredClone(cells),x:3,y:0};
+    g.board[19][4]='T';g.board[18][4]='T';if(rotated)g.rotate();
+    const before=JSON.stringify(g),landing=g.landingPiece();assert.equal(JSON.stringify(g),before);
+    assert.ok(g.fits(landing));assert.equal(g.fits({...landing,y:landing.y+1}),false);
+    const expected=landing.cells.flatMap((row,dy)=>row.flatMap((cell,dx)=>cell?[[landing.x+dx,landing.y+dy]]:[]));
+    g.drop();for(const [x,y]of expected)assert.equal(g.board[y][x],type);
+  }
+});
+test('clear events record original rows, old-level points, and level transitions',()=>{
+  const g=fresh();g.lines=9;g.board[19].fill('T');for(let x=3;x<7;x++)g.board[19][x]=null;
+  g.piece={type:'I',cells:structuredClone(SHAPES.I),x:3,y:18};g.lock();
+  assert.deepEqual(g.lastClearEvent,{rows:[19],points:40,levelBefore:1,levelAfter:2});
+  assert.equal(g.interval,640);const y=g.piece.y;g.tick(639);assert.equal(g.piece.y,y);g.tick(1);assert.equal(g.piece.y,y+1);
+  g.drop();assert.equal(g.lastClearEvent,null);assert.equal(g.lastClear,0);
+  g.reset();assert.equal(g.lastClearEvent,null);
+});
+test('gravity accelerates on every level until its lower bound',()=>{
+  const g=fresh();let previous=Infinity;
+  for(let level=1;level<=20;level++){g.level=level;assert.ok(g.interval<=previous);assert.ok(g.interval>=80);previous=g.interval;}
+  g.level=5;assert.ok(Math.abs(g.interval-327.68)<.001);
+});
