@@ -95,6 +95,8 @@ An upward-dominant swipe that reaches the minimum distance rotates clockwise onc
 
 **Interpretation of “upward/clockwise”:** upward swipe means a clockwise rotation of the piece. This release does not recognize drawn circular/arc paths. Circular strokes conflict with continuous horizontal movement and are not silently treated as a special extra gesture. Help must say “Swipe up to rotate clockwise,” not promise circle drawing. A future explicit arc gesture would require its own disambiguation design and tests.
 
+The user explicitly confirmed “Upward swipe rotates clockwise” when asked to clarify; this is the approved mapping.
+
 ## Input lifecycle and conflict prevention
 
 - Bind direct manipulation only to the actual matrix canvas/board hit area, not the whole page, score panel, next preview, headers, footer, dialogs, or overlay buttons. Matrix gestures are enabled only when the saved mode is direct, game state is playing, and no dialog/overlay blocks play.
@@ -150,3 +152,11 @@ Parent verification includes the existing pre-PWA player's settings migration pl
 - Direct mode is the normal touch layout; semantic visible controls remain an opt-in accessibility alternative.
 
 These decisions are deliberate disambiguation rules for the user's requested interactions and must be reflected in implementation/help/tests rather than hidden assumptions.
+
+## Isolated-worktree verification — 14 November 2026
+
+Implementation in `feat/direct-touch` passed `npm run test:all`: 32 engine/build/gesture tests, the retained keyboard/button/ghost/celebration suite, real-touch direct-input checks, PWA/zoom/CSP/privacy checks, adversarial offline/update tests, and both performance gates. Existing button fixtures select Visible buttons explicitly; separate migration tests prove that old two-boolean options retain their values and receive the direct default.
+
+The direct browser gate includes an explicit post-flick Help-open check. A reproduced Chromium native-touch click-suppression issue was fixed using direct/playing-only canvas `touchstart` cancellation; no global touchmove listener was introduced. Cached recognizer/controller assets and offline direct play/help/privacy pass.
+
+A gesture-specific lifecycle run used 260 real touch taps, repeated options/control-mode changes, pause/resume and restarts. Retained DOM/listener counts stayed 407/96; post-GC heap grew about 139 KB. Across 360 high-rate pointer moves over 60 frames, the gate recorded 0 board layout reads, 0 DOM mutations and 40 board redraws; paused RAF was 0. The separate legacy gate still covers 1,320 controlled placements. These are Chromium laboratory measurements, not physical iOS/Android gesture or battery certification. Parent owns final independent review, merged integration testing, commit, push and Pages verification.

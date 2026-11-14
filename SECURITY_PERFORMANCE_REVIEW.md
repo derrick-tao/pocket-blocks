@@ -51,6 +51,18 @@ Chromium in this managed Linux environment; 1280×900 viewport; headless; fixed 
 - New worker adversarial checks: declined/accepted update, same-ID manifest mismatch and reuse, failed candidate preservation, interrupted candidate recovery, first-install retry, old-tab assets, unrelated/Confetti cache preservation.
 - Browser suites run sequentially. `npm run test:all` is the release gate; browser/offline/performance fixtures bind 127.0.0.1 only. No public load/stress testing.
 
+## Direct-touch enhancement review — 14 November 2026
+
+The isolated direct-touch branch adds a pure gesture recognizer and matrix-only adapter, with no runtime packages, network requests, stored gesture history, production debug globals, separate RAF chain, or tap timer. The recognizer advances within the one existing playing frame loop; its pending tap, pose snapshot and bounded pointer-ID set are cleared at lifecycle boundaries. Actions emitted by it preserve the engine's collision, score, speed and lock behavior. Stable run-generation plus lock-count tokens prevent delayed taps/strokes from reaching a different piece, including identical shapes or a restart.
+
+Reviewed handling includes conservative release-only downward flick thresholds, delayed single-tap vs exactly-one counter-clockwise double-tap, distance-coupled movement without stationary repeat, blocked-direction discard, bounded frame/release action attempts, final-pointer flush, and cancellation for diagonals, capture loss, multiple fingers, outside release, modals, blur/hide/scroll/resize/restart and mode changes. The new mode enum is validated separately from existing ghost/celebration booleans; old stored booleans are preserved. The build fingerprints and precaches the recognizer/adapter transitively under the existing integrity and CSP policy.
+
+A real browser issue was reproduced and fixed: after a matrix flick, Chromium's legacy touch-default path could suppress the next UI tap even though the Help pointer events were not canceled. Matrix-only, enabled-play-only non-passive `touchstart` cancellation prevents that native path. No global `touchmove` cancellation was added; page margins and dialogs keep their existing scrolling policy. The permanent browser gate explicitly checks that Help opens after an offline flick.
+
+The gesture-specific performance gate uses 260 real touch taps with repeated options/mode switches, pause/resume and restart, separately from the retained 1,320 legacy-button placement test. One recorded Chromium run retained 407 DOM nodes and 96 listeners in all samples; post-GC JS heap grew 2,427,344 → 2,566,060 bytes (about139KB). Across360 pointer moves over60 frames it observed zero board layout reads, zero DOM mutations, and40 board redraws. Paused RAF remained zero. These are bounded laboratory checks, not physical-device latency/battery guarantees.
+
+The user confirmed upward swipe rotates clockwise. Drawn circles/arcs are not recognized. Visible semantic controls remain available through Game options as an accessible alternative to the default unobstructed touch layout. Physical iOS/Android gesture feel and VoiceOver usage require device-specific follow-up; Chromium/CDP is not a physical mobile installation test.
+
 ## Remaining limitations
 
 Chromium emulation and synthetic Safari gesture events are not a physical iOS test. Real iPhone/iPad Home Screen installation, safe-area appearance, pinch gestures, separate standalone storage behavior, Safari/WebKit, Firefox, low-end Android and long-duration battery/GPU behavior remain unverified unless the parent records additional checks. Browser/OS accessibility controls can override zoom requests; desktop browser chrome cannot be locked.

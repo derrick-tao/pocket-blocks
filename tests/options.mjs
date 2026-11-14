@@ -50,6 +50,7 @@ try{
   assert.equal(await rp.locator('#clear-celebration').isVisible(),true);assert.equal(await rp.locator('#clear-celebration').evaluate(node=>getComputedStyle(node).animationName),'none');await reduced.close();
   // Real touch events: releasing, moving away, cancellation, capture loss, and long-press menus.
   const mobile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+  await mobile.addInitScript(()=>localStorage.setItem('pocket-blocks-options',JSON.stringify({touchMode:'buttons'})));
   const phone=await mobile.newPage();observe(phone);await phone.goto(base);
   await phone.evaluate(async url=>{
     const {Game}=await import(url);window.__positions=[];

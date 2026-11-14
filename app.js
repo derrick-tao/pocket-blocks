@@ -1,16 +1,20 @@
 import {Game, SHAPES} from './engine.js';
 import {initOffline} from './offline.js';
+import {initDirectTouch} from './touch-controller.js';
 const $ = id => document.getElementById(id);
 const game = new Game();
 const colors = {I:'#7ebcb0',J:'#7c9cce',L:'#e5a169',O:'#d6c56e',S:'#9bb773',T:'#ad94b9',Z:'#cd7d6f'};
 const board = $('board'), next = $('next'), area = $('game-area');
 let best = 0, sound = false, audio, last = performance.now(), priorState, priorLocks = 0;
 try { const saved=Number(localStorage.getItem('pocket-blocks-best'));if(Number.isFinite(saved)&&saved>=0)best=saved; } catch {}
-const options = {ghost:true, celebrations:true};
+const touchCapable=navigator.maxTouchPoints>0||matchMedia('(pointer: coarse)').matches;
+const options = {ghost:true, celebrations:true,touchMode:'direct'};
 try {
   const saved = JSON.parse(localStorage.getItem('pocket-blocks-options'));
-  for (const key of Object.keys(options)) if (typeof saved?.[key] === 'boolean') options[key] = saved[key];
+  for (const key of ['ghost','celebrations']) if (typeof saved?.[key] === 'boolean') options[key] = saved[key];
+  if(['direct','buttons'].includes(saved?.touchMode))options.touchMode=saved.touchMode;
 } catch {}
+let directInput=null,runGeneration=0;
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 let celebration = null,frameHandle=0,inFrame=false,priorModel='',priorDraw='',priorNext='',geometryEpoch=0;
 const canvasGeometry=new Map();
@@ -30,11 +34,11 @@ function celebrate(clear) {
 const held = new Map();
 const touchPresses = new Map();
 function announce(message) { $('announcement').textContent = message; }
+function unlockAudio(){if(!sound)return;try{audio??=new(window.AudioContext||window.webkitAudioContext)();if(audio.state==='suspended')audio.resume().catch(()=>{});}catch{}}
 function beep(frequency = 330) {
   if (!sound) return;
   try {
-    audio ??= new (window.AudioContext || window.webkitAudioContext)();
-    if (audio.state === 'suspended') audio.resume().catch(() => {});
+    unlockAudio();if(!audio)return;
     const oscillator = audio.createOscillator(), gain = audio.createGain();
     oscillator.type = 'triangle'; oscillator.frequency.value = frequency;
     gain.gain.setValueAtTime(.045, audio.currentTime);
@@ -49,12 +53,13 @@ function releasePointer(pointerId) {
   touchPresses.delete(pointerId);
   if (press) press.button.classList.toggle('is-held',[...touchPresses.values()].some(other=>other.button===press.button));
 }
-function clearInputs() {
+function clearHeldInputs() {
   held.clear();
   for (const id of [...touchPresses.keys()]) releasePointer(id);
 }
+function clearInputs(){clearHeldInputs();directInput?.cancel();}
 function focusGame() { area.focus({preventScroll:true}); }
-function start() { clearInputs(); stopCelebration(); game.reset(); priorLocks=0; last=performance.now(); focusGame(); beep(440); sync(); }
+function start() { clearInputs(); stopCelebration();runGeneration++; game.reset(); priorLocks=0; last=performance.now(); focusGame(); beep(440); sync(); }
 function pause() { clearInputs(); stopCelebration(); game.pause(); sync(); }
 function togglePause() {
   clearInputs();
@@ -63,15 +68,17 @@ function togglePause() {
   else if (game.state === 'paused') { game.resume(); last=performance.now(); }
   focusGame(); sync();
 }
-function act(action) {
-  if (game.state !== 'playing') return;
-  if (action === 'left') game.move(-1);
-  if (action === 'right') game.move(1);
-  if (action === 'down') game.down(true);
-  if (action === 'cw' && game.rotate()) beep(310);
-  if (action === 'ccw' && game.rotate(-1)) beep(290);
-  if (action === 'drop') { game.drop(); beep(170); }
-  sync();
+function act(action,{direct=false}={}) {
+  if(!direct)directInput?.cancel();
+  if (game.state !== 'playing') return false;
+  let accepted=false;
+  if (action === 'left') accepted=game.move(-1);
+  if (action === 'right') accepted=game.move(1);
+  if (action === 'down') accepted=game.down(true);
+  if (action === 'cw' && (accepted=game.rotate())) beep(310);
+  if (action === 'ccw' && (accepted=game.rotate(-1))) beep(290);
+  if (action === 'drop') { game.drop(); beep(170);accepted=true; }
+  if(!inFrame)sync();return accepted;
 }
 function press(key, action) {
   act(action);
@@ -105,16 +112,17 @@ window.addEventListener('pointermove',event=>{
 },true);
 window.addEventListener('contextmenu',event=>{
   clearInputs();
-  if (event.target instanceof Element && event.target.closest('[data-action]')) event.preventDefault();
+  if (event.target instanceof Element && (event.target.closest('[data-action]')||(event.target===board&&options.touchMode==='direct'))) event.preventDefault();
 },true);
 window.addEventListener('pagehide',clearInputs);
 window.addEventListener('resize',clearInputs);
+window.addEventListener('orientationchange',clearInputs);
 window.addEventListener('scroll',clearInputs,true);
 window.addEventListener('pointerout',event=>{if(event.pointerType==='mouse'&&!event.relatedTarget)clearInputs();});
 document.querySelectorAll('[data-action]').forEach(button => {
   button.addEventListener('pointerdown', event => {
     if (event.button !== 0) return;
-    event.preventDefault(); focusGame();
+    event.preventDefault();directInput?.cancel();focusGame();
     try { button.setPointerCapture(event.pointerId); }
     catch { act(button.dataset.action); return; }
     if (game.state!=='playing') return;
@@ -145,6 +153,19 @@ $('close-help').onclick = () => $('instructions').close();
 $('instructions').addEventListener('close',focusGame);
 $('ghost-option').checked=options.ghost;
 $('celebrations-option').checked=options.celebrations;
+function applyTouchMode(){
+  const buttons=document.querySelector('.touch-controls');buttons.hidden=options.touchMode!=='buttons';buttons.classList.toggle('chosen-buttons',options.touchMode==='buttons');
+  board.classList.toggle('direct-touch',options.touchMode==='direct');
+  $('touch-hint').hidden=options.touchMode!=='direct'||!touchCapable;
+  $('touch-mode-option').value=options.touchMode;
+  if(game.state==='ready')$('overlay-hint').textContent=options.touchMode==='direct'&&touchCapable?'Tap Start game, then guide the piece.':'or press Enter';
+}
+applyTouchMode();
+$('touch-mode-option').onchange=event=>{
+  clearInputs();options.touchMode=event.target.value==='buttons'?'buttons':'direct';
+  try{localStorage.setItem('pocket-blocks-options',JSON.stringify(options));}catch{}
+  applyTouchMode();
+};
 for (const [id,key] of [['ghost-option','ghost'],['celebrations-option','celebrations']]) {
   $(id).onchange=event=>{
     options[key]=event.target.checked;
@@ -267,6 +288,7 @@ function frame(now) {
   frameHandle=0;inFrame=true;
   const dt=Math.min(now-last,100);last=now;
   if(game.state==='playing'){
+    directInput?.advance(performance.now());
     for(const [id,press]of touchPresses)if(!press.button.hasPointerCapture(id))releasePointer(id);
     if(celebration){celebration.age+=dt;if(celebration.age>=celebration.duration)stopCelebration();}
     for(const input of held.values())if(now>=input.at){input.at=now+55;act(input.action);}
@@ -274,4 +296,5 @@ function frame(now) {
   }
   inFrame=false;if(game.state==='playing'&&!frameHandle)frameHandle=requestAnimationFrame(frame);
 }
+directInput=initDirectTouch({board,snapshot:()=>({enabled:options.touchMode==='direct'&&game.state==='playing'&&!document.querySelector('dialog[open]'),token:`${runGeneration}:${game.locks}`,piece:game.piece}),emit:action=>act(action,{direct:true}),beginInput:()=>{clearHeldInputs();focusGame();unlockAudio();}});
 sync();initOffline({pause,focusGame,isActive:()=>['playing','paused'].includes(game.state)});
