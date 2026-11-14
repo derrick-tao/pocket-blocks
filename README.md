@@ -1,31 +1,53 @@
 # Pocket Blocks
 
-A lightweight classic Tetris webapp for desktop and mobile. Built with vanilla JavaScript and Canvas; no runtime dependencies, account, or backend.
+A lightweight classic falling-block game for desktop and mobile, with keyboard/touch controls, a landing outline, optional line-clear celebrations, and locally saved best scores/options.
 
-See [SPEC.md](SPEC.md) for the full gameplay, accessibility, and delivery contract.
+- [Play](https://derrick-tao.github.io/pocket-blocks/)
+- [Gameplay spec](SPEC.md)
+- [Offline/iOS/security/performance spec](OFFLINE_IOS_SPEC.md)
+- [Security and performance review](SECURITY_PERFORMANCE_REVIEW.md)
+- [Privacy and local storage](privacy.html)
 
-## Run locally
-Requires Python 3 to serve and Node.js 22+ for tests/build.
+## Download once, play offline
+
+Open the game over HTTPS and wait for **Ready to play offline**. The complete game, icons, instructions, options, and privacy notice are cached. You can then reopen it without Wi-Fi; installation is optional. Reopening starts ready, retaining the best score and visual options rather than the in-progress board.
+
+A cold first visit needs internet. Browser/private-mode restrictions, clearing site data, or storage eviction can remove the download. Reconnect and use **Install / offline play → Retry offline download** if the download fails. A completed new release waits for your update choice; active games ask before restarting. Failed candidate downloads preserve the working snapshot.
+
+## Add to the iPhone/iPad Home Screen
+
+In Safari, open the game → **Share → Add to Home Screen** → enable **Open as Web App** if offered → **Add**. Then **open the installed app once online and wait for Ready to play offline there**. Safari and the standalone container may have separate storage, so a Safari download does not prove the Home Screen copy is downloaded. iOS does not expose a programmatic install prompt to this app. Other browsers may offer an Install app prompt/menu item.
+
+Opaque 180px Apple and 192px/512px/maskable manifest icons use Pocket Blocks’ original orange blocks on dark green. They are simple programmatically generated rectangles with no baked OS corner rounding. The manifest and asset paths support GitHub Pages project subpaths.
+
+## Controls and zoom
+
+Arrows or A/D/S move and soft drop; Up/W/X rotates clockwise, Z counterclockwise; Space hard drops; P/Escape pauses/resumes; Enter starts/resumes. Touch buttons support held movement and multiple fingers. Release, cancellation, capture loss, context menu, blur, page hide, scroll, and resize clear held input.
+
+The mobile viewport requests scale 1 with zoom disabled. Page/dialog touch policies preserve normal scrolling while excluding pinch/double-tap zoom; Safari gesture events are prevented without canceling all touchmove events. Touch game controls retain touch-action:none. Browser/OS accessibility settings can override these requests; desktop browser UI zoom cannot be disabled. Physical iOS pinch/Home Screen installation remains unverified here.
+
+## Develop and verify
+
+Node.js 22+; Python 3 only for the optional manual server:
 
 ```sh
+npm ci
+npx playwright install chromium
+npm run test:all
 npm start
-# Open http://localhost:4173
-npm test
-npm run build
-npm run test:options
+# http://localhost:4173
 ```
 
-Production files are staged in `dist/`. Static hosting must serve ES modules over HTTP(S). All assets use relative paths, including on GitHub Pages project URLs.
+`npm test` runs the 12 engine tests plus build/PWA assertions and generates dist. Browser gates run sequentially to avoid focus/auto-pause interference and start isolated localhost-only fixture servers under `/pocket-blocks/`. `npm run test:browser`, `test:options`, `test:pwa`, `test:offline`, and `test:performance` can be run individually after a build. `TEST_URL` selects a normal live-site smoke check for browser/options/PWA suites. Local Linux can use `/usr/bin/chromium`; override with CHROMIUM_PATH, while CI installs the matching Playwright browser. Screenshots and measurements are ignored in test-results.
 
-## Controls
-Arrow keys or A/D/S move and soft drop. Up/W/X rotates clockwise; Z rotates counterclockwise. Space hard drops. P/Escape pauses/resumes. Enter starts/resumes. Touch buttons support held movement and release safely when interrupted or moved off the button. How to play includes the scoring rules. Sound starts off. Best score is stored locally if browser storage is available.
+The build discovers root `.js` runtime modules excluding build.js/sw.js, rejects external/non-root runtime imports, fingerprints the dependency graph, and rewrites local JS/CSS references. Put test/tooling code in subdirectories. It generates a release ID from production inputs plus build logic, and an integrity manifest embedded in sw.js. Source files are never rewritten by the build. Serve **dist/**, not the source worker template. Runtime dependencies remain zero.
 
-**Game options** independently toggles the landing outline and line-clear celebrations. Preferences save locally; opening options pauses the game. Celebrations respect reduced motion. Level increases every ten cleared lines; gravity starts at 800 ms per row, multiplies its interval by 0.8 per level, and stops accelerating at 80 ms. This is classic-inspired, not an exact historical or modern Tetris ruleset: there is no seven-bag, hold, wall kicks, lock delay, or T-spin scoring.
+## Release and hosting limits
 
-## GitHub Pages
-In repository Settings → Pages, select **GitHub Actions** as the build source. Push to `main` or run the **Test and deploy to GitHub Pages** workflow. It runs engine tests, builds the static files, and deploys the artifact with the official Pages actions.
+GitHub Actions runs locked npm install, matching Chromium, engine/build/browser/options/PWA/offline/performance gates before Pages artifact upload and deployment. Actions are SHA-pinned with minimal permissions and credential persistence disabled; Dependabot proposes updates. PRs run gates without deploying.
 
-## Validation
-`npm test` covers engine rules, landing projection, clear metadata, speed, and state transitions. `npm run test:options` starts its own localhost server and checks the built site's visual options, clearing effects, level-up, reduced motion, and stuck-control release paths, including real multi-touch. Browser smoke checks and screenshots are in `tests/browser.mjs`; run `npm start` first, then `node tests/browser.mjs`. Browser tests require `npm ci` and Playwright Chromium (`npx playwright install chromium`); local Linux can use `/usr/bin/chromium` or set `CHROMIUM_PATH`. CI uses matching Playwright Chromium and gates deployment on engine and options/input regressions. No browser tooling ships in production.
+A candidate cache is marked complete only after verifying every required byte hash. Existing committed same-ID caches are never overwritten on install failure; interrupted uncommitted candidates can recover. Separate Pocket/path cache names preserve unrelated apps, including Confetti Blocks. Old assets are retained for other open Pocket tabs and cleaned when one app tab remains on a subsequent cleanup/visit.
 
-Classic-inspired rules are specified explicitly rather than claiming exact emulation of a particular historical release. Canvas gameplay requires visual perception. Latest Chromium is tested here; physical mobile devices, Firefox, and Safari need separate verification.
+The app ships a restrictive meta CSP and no-referrer metadata. GitHub Pages cannot set arbitrary HTTP headers. Recommended dedicated-origin hosting headers include CSP frame-ancestors 'none', X-Content-Type-Options:nosniff, Referrer-Policy:no-referrer, and Permissions-Policy disabling unused camera/microphone/geolocation. A meta CSP cannot enforce frame-ancestors. No ignored _headers file or unsupported header guarantee is supplied. Same-origin GitHub project sites share browser storage despite worker scopes.
+
+Gameplay runs independently on each player's device, with no score API/backend. This does not establish a GitHub Pages concurrency SLA; cold-download bursts and traffic limits still need a hosting plan. No public stress/load test was performed. Physical iOS/Android devices, Firefox and Safari/WebKit remain separate verification work.

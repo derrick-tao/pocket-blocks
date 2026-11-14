@@ -4,10 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/engine.test.js",
+    "test": "node --test tests/engine.test.js tests/build.test.js",
     "build": "node build.js",
     "start": "npm run build && python3 -m http.server 4173 --bind 127.0.0.1 --directory dist",
-    "test:options": "npm run build && node tests/options.mjs"
+    "test:options": "node tests/options.mjs",
+    "test:browser": "node tests/browser.mjs",
+    "test:pwa": "node tests/pwa.mjs",
+    "test:offline": "node tests/offline-update.mjs",
+    "test:performance": "node tests/performance.mjs",
+    "test:all": "npm test && npm run test:browser && npm run test:options && npm run test:pwa && npm run test:offline && npm run test:performance"
   },
   "devDependencies": {
     "@playwright/test": "^1.65.0"

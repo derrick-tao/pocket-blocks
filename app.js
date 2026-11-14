@@ -1,18 +1,23 @@
 import {Game, SHAPES} from './engine.js';
+import {initOffline} from './offline.js';
 const $ = id => document.getElementById(id);
 const game = new Game();
 const colors = {I:'#7ebcb0',J:'#7c9cce',L:'#e5a169',O:'#d6c56e',S:'#9bb773',T:'#ad94b9',Z:'#cd7d6f'};
 const board = $('board'), next = $('next'), area = $('game-area');
 let best = 0, sound = false, audio, last = performance.now(), priorState, priorLocks = 0;
-try { best = Math.max(0, Number(localStorage.getItem('pocket-blocks-best')) || 0); } catch {}
+try { const saved=Number(localStorage.getItem('pocket-blocks-best'));if(Number.isFinite(saved)&&saved>=0)best=saved; } catch {}
 const options = {ghost:true, celebrations:true};
 try {
   const saved = JSON.parse(localStorage.getItem('pocket-blocks-options'));
   for (const key of Object.keys(options)) if (typeof saved?.[key] === 'boolean') options[key] = saved[key];
 } catch {}
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
-let celebration = null;
-function stopCelebration() { celebration=null; $('clear-celebration').hidden=true; }
+let celebration = null,frameHandle=0,inFrame=false,priorModel='',priorDraw='',priorNext='',geometryEpoch=0;
+const canvasGeometry=new Map();
+function ensureLoop(){if(game.state==='playing'){if(!frameHandle&&!inFrame){last=performance.now();frameHandle=requestAnimationFrame(frame);}}else if(frameHandle){cancelAnimationFrame(frameHandle);frameHandle=0;}}
+function setText(id,text){const node=$(id);if(node.textContent!==text)node.textContent=text;}
+function invalidateGeometry(){canvasGeometry.clear();geometryEpoch++;priorDraw='';priorNext='';draw();}
+function stopCelebration() { if(celebration)priorDraw='';celebration=null;if(!$('clear-celebration').hidden)$('clear-celebration').hidden=true; }
 function celebrate(clear) {
   stopCelebration();
   if (!options.celebrations || !clear) return;
@@ -35,7 +40,7 @@ function beep(frequency = 330) {
     gain.gain.setValueAtTime(.045, audio.currentTime);
     gain.gain.exponentialRampToValueAtTime(.001, audio.currentTime+.09);
     oscillator.connect(gain); gain.connect(audio.destination);
-    oscillator.start(); oscillator.stop(audio.currentTime+.1);
+    oscillator.onended=()=>{oscillator.disconnect();gain.disconnect();};oscillator.start(); oscillator.stop(audio.currentTime+.1);
   } catch {}
 }
 function releasePointer(pointerId) {
@@ -74,7 +79,7 @@ function press(key, action) {
 }
 const keys = {ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',ArrowDown:'down',KeyS:'down',ArrowUp:'cw',KeyW:'cw',KeyX:'cw',KeyZ:'ccw',Space:'drop'};
 document.addEventListener('keydown', event => {
-  if ($('instructions').open || $('options-dialog').open || (event.target instanceof HTMLButtonElement)) return;
+  if ($('instructions').open || $('options-dialog').open || $('install-dialog').open || (event.target instanceof HTMLButtonElement)) return;
   const focused = document.activeElement === area || document.activeElement === document.body;
   if (!focused) return;
   if (keys[event.code] || ['KeyP','Escape','Enter'].includes(event.code)) event.preventDefault();
@@ -157,18 +162,20 @@ $('close-options').onclick=()=>$('options-dialog').close();
 $('options-dialog').addEventListener('close',focusGame);
 reducedMotion.addEventListener('change',()=>{stopCelebration();draw();});
 window.addEventListener('blur',pause);
-document.addEventListener('visibilitychange',() => { if (document.hidden) pause(); });
+document.addEventListener('visibilitychange',() => { if (document.hidden) {pause();try{audio?.suspend().catch(()=>{});}catch{}} });
 function sync() {
-  $('score').textContent = String(game.score).padStart(6,'0');
-  $('level').textContent = String(game.level).padStart(2,'0');
-  $('lines').textContent = String(game.lines).padStart(2,'0');
+  const model=[game.score,game.lines,game.level,game.state,game.locks,game.piece.x,game.piece.y,game.piece.cells.flat().join(''),game.next].join(':');
+  if(model===priorModel){if(celebration||priorDraw==='')draw();ensureLoop();return;}priorModel=model;
+  setText('score',String(game.score).padStart(6,'0'));
+  setText('level',String(game.level).padStart(2,'0'));
+  setText('lines',String(game.lines).padStart(2,'0'));
   if (game.score > best) {
     best = game.score;
     try { localStorage.setItem('pocket-blocks-best',String(best)); } catch {}
   }
-  $('best').textContent = best.toLocaleString();
-  $('pause').disabled = !['playing','paused'].includes(game.state);
-  $('pause').querySelector('.action-label').textContent = game.state === 'paused' ? 'Resume' : 'Pause';
+  setText('best',best.toLocaleString());
+  const disabled=!['playing','paused'].includes(game.state);if($('pause').disabled!==disabled)$('pause').disabled=disabled;
+  const label=game.state==='paused'?'Resume':'Pause';if($('pause').querySelector('.action-label').textContent!==label)$('pause').querySelector('.action-label').textContent=label;
   if (game.locks !== priorLocks) {
     priorLocks = game.locks;
     if (game.lastClear) { announce(`${game.lastClear} ${game.lastClear === 1 ? 'line' : 'lines'} cleared. Score ${game.score}. Level ${game.level}.`); beep(550); celebrate(game.lastClearEvent); }
@@ -195,16 +202,13 @@ function sync() {
     }
     announce({ready:'Ready. Press Enter or Start game to play.',playing:'Game started. Good luck!',paused:'Game paused.',over:`Game over. Score ${game.score}. Press Enter to play again.`}[state]);
   }
-  next.setAttribute('aria-label',`Next piece: ${game.next}`);
-  draw();
+  const nextLabel=`Next piece: ${game.next}`;if(next.getAttribute('aria-label')!==nextLabel)next.setAttribute('aria-label',nextLabel);
+  draw();ensureLoop();
 }
 function context(canvas) {
-  const r=canvas.getBoundingClientRect(), ratio=Math.min(window.devicePixelRatio || 1,3);
-  const width=Math.round(r.width*ratio), height=Math.round(r.height*ratio);
-  if (canvas.width !== width || canvas.height !== height) { canvas.width=width; canvas.height=height; }
-  const ctx=canvas.getContext('2d'); ctx.setTransform(ratio,0,0,ratio,0,0);
-  ctx.clearRect(0,0,r.width,r.height);
-  return {ctx,width:r.width,height:r.height};
+  const ratio=Math.min(window.devicePixelRatio||1,3);let cached=canvasGeometry.get(canvas);
+  if(!cached||cached.ratio!==ratio){const r=canvas.getBoundingClientRect();cached={ctx:canvas.getContext('2d'),width:r.width,height:r.height,ratio};canvasGeometry.set(canvas,cached);const width=Math.round(r.width*ratio),height=Math.round(r.height*ratio);if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height;}}
+  const {ctx,width,height}=cached;ctx.setTransform(ratio,0,0,ratio,0,0);ctx.clearRect(0,0,width,height);return cached;
 }
 function block(ctx,x,y,size,type) {
   ctx.fillStyle=colors[type]; ctx.fillRect(x+1,y+1,size-2,size-2);
@@ -212,6 +216,8 @@ function block(ctx,x,y,size,type) {
   ctx.fillStyle='#00000012'; ctx.fillRect(x+2,y+size-4,size-4,2);
 }
 function draw() {
+  const key=[geometryEpoch,window.devicePixelRatio,game.state,game.locks,game.piece.x,game.piece.y,game.piece.cells.flat().join(''),options.ghost,celebration?.age??'none'].join(':');
+  if(key===priorDraw)return;priorDraw=key;
   const {ctx,width,height}=context(board), size=width/10;
   ctx.strokeStyle='#a7bca00b'; ctx.lineWidth=1;
   for (let x=1;x<10;x++) { ctx.beginPath();ctx.moveTo(x*size,0);ctx.lineTo(x*size,height);ctx.stroke(); }
@@ -244,6 +250,7 @@ function draw() {
     }
     ctx.restore();
   }
+  const nextKey=[game.next,geometryEpoch,window.devicePixelRatio].join(':');if(nextKey===priorNext)return;priorNext=nextKey;
   const preview=context(next), cells=[];
   SHAPES[game.next].forEach((row,y)=>row.forEach((cell,x)=>{if(cell)cells.push([x,y]);}));
   const minX=Math.min(...cells.map(c=>c[0])),minY=Math.min(...cells.map(c=>c[1]));
@@ -251,15 +258,20 @@ function draw() {
   const s=Math.min(23,(preview.width-12)/cols);
   for (const [x,y] of cells) block(preview.ctx,(preview.width-cols*s)/2+(x-minX)*s,(preview.height-rows*s)/2+(y-minY)*s,s,game.next);
 }
-new ResizeObserver(draw).observe(area);
+const resizeObserver=new ResizeObserver(invalidateGeometry);resizeObserver.observe(area);resizeObserver.observe(next);
+window.addEventListener('resize',invalidateGeometry);
+let dprQuery;
+function watchDpr(){dprQuery?.removeEventListener('change',dprChanged);dprQuery=matchMedia(`(resolution: ${window.devicePixelRatio||1}dppx)`);dprQuery.addEventListener('change',dprChanged);}
+function dprChanged(){invalidateGeometry();watchDpr();}watchDpr();
 function frame(now) {
-  const dt=Math.min(now-last,100); last=now;
-  if (game.state === 'playing') {
-    for (const [id,press] of touchPresses) if (!press.button.hasPointerCapture(id)) releasePointer(id);
-    if (celebration) { celebration.age+=dt; if (celebration.age>=celebration.duration) stopCelebration(); }
-    for (const input of held.values()) if (now>=input.at) { input.at=now+55; act(input.action); }
-    game.tick(dt); sync();
+  frameHandle=0;inFrame=true;
+  const dt=Math.min(now-last,100);last=now;
+  if(game.state==='playing'){
+    for(const [id,press]of touchPresses)if(!press.button.hasPointerCapture(id))releasePointer(id);
+    if(celebration){celebration.age+=dt;if(celebration.age>=celebration.duration)stopCelebration();}
+    for(const input of held.values())if(now>=input.at){input.at=now+55;act(input.action);}
+    game.tick(dt);sync();
   }
-  requestAnimationFrame(frame);
+  inFrame=false;if(game.state==='playing'&&!frameHandle)frameHandle=requestAnimationFrame(frame);
 }
-sync(); requestAnimationFrame(frame);
+sync();initOffline({pause,focusGame,isActive:()=>['playing','paused'].includes(game.state)});

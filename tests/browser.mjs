@@ -1,8 +1,9 @@
-import {chromium} from '@playwright/test';
+import {launchBrowser,serve} from './helpers.mjs';
 import assert from 'node:assert/strict';
 import {mkdir} from 'node:fs/promises';
-const base=process.env.TEST_URL || 'http://127.0.0.1:4173/';
-const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH || '/usr/bin/chromium',args:['--no-sandbox']});
+const local=process.env.TEST_URL?null:await serve();
+const base=process.env.TEST_URL||local.url;
+const browser=await launchBrowser();
 const errors=[];
 await mkdir('test-results',{recursive:true});
 try {
@@ -67,4 +68,4 @@ try {
   assert.ok(Number(await storagePage.locator('#score').innerText())>0);await blocked.close();
   assert.deepEqual(errors,[]);
   console.log('Browser checks passed: keyboard, touch, pause, game over, restart, persistence, blocked storage, 320px layout; no page errors.');
-} finally { await browser.close(); }
+} finally { await browser.close();await local?.close(); }
