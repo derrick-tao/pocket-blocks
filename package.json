@@ -16,6 +16,6 @@
     "test:all": "npm test && npm run test:browser && npm run test:options && npm run test:direct && npm run test:pwa && npm run test:offline && npm run test:performance"
   },
   "devDependencies": {
-    "@playwright/test": "^1.65.0"
+    "@playwright/test": "^1.65.1"
   }
 }
